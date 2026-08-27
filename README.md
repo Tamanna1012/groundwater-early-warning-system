@@ -63,8 +63,8 @@ until this section says otherwise.
 - [x] Deeper EDA & statistical analysis (`docs/EDA_FINDINGS.md`: seasonality, site-type effects, spatial autocorrelation)
 - [x] Feature engineering (`src/features/build_features.py`, `docs/FEATURES.md`) -- note: `long_term_slope_m_per_year` has a known look-ahead-bias caveat to fix before training (see docs/FEATURES.md)
 - [x] Baseline forecast (`src/models/baseline_forecast.py`, `docs/BASELINE_RESULTS.md`) -- seasonal-naive beats naive by 23.8% MAE nationally, but naive wins in 8/10 of the fastest-declining districts (trend dominates over season there); this is the bar (MAE 1.809m) any real model must clear
-- [ ] ML/time-series model(s) and comparison against baseline
-- [ ] Evaluation (backtested MAE/RMSE against baseline, by district)
+- [x] ML/time-series model(s) and comparison against baseline (`src/models/ml_forecast.py`, `docs/ML_MODEL_RESULTS.md`) -- gradient boosting beats the best baseline by 11.6% MAE nationally (1.600m vs 1.809m), but only wins outright in 4/10 of the fastest-declining districts, likely due to small per-district sample sizes; this national-vs-district gap is unresolved and flagged for the evaluation stage
+- [ ] Evaluation (backtested MAE/RMSE against baseline, by district) -- specifically: is the district-level gap above consistent across other time splits, or noise?
 - [ ] Explainability
 - [ ] Actionable output: district-level risk map + forecast
 - [ ] Dashboard
@@ -86,6 +86,7 @@ docs/
   EDA_FINDINGS.md           generated: seasonality, site-type effects, spatial autocorrelation
   FEATURES.md               generated: feature table reference, coverage, look-ahead-bias caveat
   BASELINE_RESULTS.md       generated: naive vs seasonal-naive backtest, overall/season/district
+  ML_MODEL_RESULTS.md       generated: Ridge + gradient boosting vs baselines, feature importance, district check
 reports/figures/            generated plots referenced from docs/
 ```
 
@@ -101,4 +102,5 @@ python src/eda/site_type_analysis.py     # writes docs/EDA_FINDINGS.md (site-typ
 python src/eda/spatial_analysis.py       # writes docs/EDA_FINDINGS.md (spatial section)
 python src/features/build_features.py    # writes data/processed/features.csv + docs/FEATURES.md
 python src/models/baseline_forecast.py   # writes docs/BASELINE_RESULTS.md + reports/figures/baseline_comparison.png
+python src/models/ml_forecast.py         # writes docs/ML_MODEL_RESULTS.md + reports/figures/model_comparison.png
 ```
