@@ -42,6 +42,11 @@ def clean(raw_path: Path = RAW_PATH) -> pd.DataFrame:
     for c in time_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
 
+    # A handful of rows have a whitespace-only SITE_TYPE (not truly missing,
+    # just an unlabeled/blank category in the source export) -- normalize so
+    # it doesn't silently become its own invisible category downstream.
+    df["SITE_TYPE"] = df["SITE_TYPE"].fillna("").str.strip().replace("", "Unlabeled")
+
     long = df.melt(
         id_vars=ID_COLS,
         value_vars=time_cols,
