@@ -7,15 +7,11 @@ full explanation of each one.
 Output: data/processed/features.csv (one row per well-quarter reading,
 gitignored -- regenerate with this script, don't hand-edit)
 
-IMPORTANT CAVEAT (read before using `long_term_slope` for anything): it is
-computed once per well from that well's ENTIRE history (including readings
-that come after many of the rows it's attached to). That's fine for a
-"what does this well look like overall" snapshot / for ranking wells by
-current risk, but it is look-ahead bias if used as a training feature to
-predict individual historical rows -- the model would be peeking at the
-future. The baseline/forecast stage must replace this with an
-expanding-window version (recomputed using only data available up to each
-row's date) before training anything on it.
+`long_term_slope_m_per_year` is an EXPANDING-WINDOW trend: each row's value
+uses only that well's readings strictly before its own date. An earlier
+version of this script computed one full-history slope per well and reused
+it on every row, which was look-ahead bias (a training feature that could
+see the future). Fixed here -- see docs/FEATURES.md for the before/after.
 """
 
 from __future__ import annotations
@@ -56,22 +52,43 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+MIN_POINTS_FOR_SLOPE = 3
+
+
+def _expanding_slope_for_well(group: pd.DataFrame) -> pd.Series:
+    """Per-row trend (m/year) using only readings strictly BEFORE that row's
+    own date -- an expanding-window linear fit, not the well's full history.
+    Computed via running sums (standard incremental least-squares) so it's
+    O(n) per well instead of refitting from scratch at every row."""
+    x = (group["date"].dt.year + (group["date"].dt.month - 1) / 12).to_numpy()
+    y = group["depth_to_water_m"].to_numpy()
+    n_total = len(x)
+
+    # prior_sum_*[i] = sum over rows [0, i) -- excludes row i itself
+    zero = np.array([0.0])
+    prior_n = np.arange(n_total, dtype=float)
+    prior_sum_x = np.concatenate([zero, np.cumsum(x)[:-1]]) if n_total > 1 else zero.copy()
+    prior_sum_y = np.concatenate([zero, np.cumsum(y)[:-1]]) if n_total > 1 else zero.copy()
+    prior_sum_xy = np.concatenate([zero, np.cumsum(x * y)[:-1]]) if n_total > 1 else zero.copy()
+    prior_sum_xx = np.concatenate([zero, np.cumsum(x * x)[:-1]]) if n_total > 1 else zero.copy()
+
+    denom = prior_n * prior_sum_xx - prior_sum_x**2
+    with np.errstate(invalid="ignore", divide="ignore"):
+        slope = (prior_n * prior_sum_xy - prior_sum_x * prior_sum_y) / denom
+
+    slope[(prior_n < MIN_POINTS_FOR_SLOPE) | (denom == 0)] = np.nan
+    return pd.Series(slope, index=group.index)
+
+
 def add_trend_feature(df: pd.DataFrame) -> pd.DataFrame:
-    """Static per-well long-term slope (m/year), same method as the
-    district-level ranking in DATA_AUDIT.md. See the module docstring for
-    why this is look-ahead and needs replacing before model training."""
-
-    def slope(group: pd.DataFrame) -> float:
-        if group["date"].nunique() < 3:
-            return np.nan
-        x = group["date"].dt.year + (group["date"].dt.month - 1) / 12
-        y = group["depth_to_water_m"]
-        m, _ = np.polyfit(x, y, 1)
-        return m
-
-    slopes = df.groupby("well_id").apply(slope, include_groups=False)
-    slopes.name = "long_term_slope_m_per_year"
-    return df.merge(slopes, on="well_id", how="left")
+    """Per-row expanding-window trend (m/year): each row's slope uses only
+    that well's readings strictly before its own date, so it's a legitimate
+    training feature (no look-ahead), unlike a single full-history slope
+    per well would be."""
+    df["long_term_slope_m_per_year"] = (
+        df.groupby("well_id", group_keys=False).apply(_expanding_slope_for_well, include_groups=False)
+    )
+    return df
 
 
 def add_spatial_feature(df: pd.DataFrame) -> pd.DataFrame:
@@ -136,7 +153,7 @@ def write_docs(features: pd.DataFrame) -> None:
         f.write("| `depth_same_quarter_last_year` | Same well's reading exactly 1 year earlier | Seasonality |\n")
         f.write("| `depth_last_reading` | Same well's immediately previous reading | Baseline signal |\n")
         f.write("| `rolling_mean_4` | Mean of the well's last 4 readings (excl. current) | Baseline signal |\n")
-        f.write("| `long_term_slope_m_per_year` | Well's full-history linear trend | Depletion / early-warning signal |\n")
+        f.write("| `long_term_slope_m_per_year` | Well's trend (m/year) using only readings before this row | Depletion / early-warning signal |\n")
         f.write("| `site_type` | Dug/bore/tube well etc. | Site-type effects |\n")
         f.write("| `neighbor_mean_depth` | Mean depth among 5 nearest wells, same date | Spatial patterns |\n")
         f.write("| `district`, `state` | Administrative region | Spatial patterns / output granularity |\n")
@@ -147,18 +164,20 @@ def write_docs(features: pd.DataFrame) -> None:
             f.write(f"| `{k}` | {v:.1%} |\n")
         f.write(
             "\n`depth_same_quarter_last_year` is missing whenever a well doesn't have a reading "
-            "exactly 1 year before the current one (gaps in monitoring); `long_term_slope_m_per_year` "
-            "is missing for wells with fewer than 3 distinct dates in their whole history.\n\n"
+            f"exactly 1 year before the current one (gaps in monitoring); `long_term_slope_m_per_year` "
+            f"is missing whenever a row has fewer than {MIN_POINTS_FOR_SLOPE} prior readings for that "
+            "well to fit a trend from yet.\n\n"
         )
         f.write(
-            "## Important caveat: look-ahead bias in `long_term_slope_m_per_year`\n\n"
-            "This feature is computed once per well from **that well's entire history**, including "
-            "readings that come after many of the rows it's attached to. That makes it useful as a "
-            "*current well profile* (e.g. for ranking wells/districts by risk today), but it is "
-            "look-ahead bias if used to train a model to predict individual historical rows -- the "
-            "model would effectively see the future. Before this feature table is used for baseline "
-            "or ML forecasting (the next pipeline stage), this column must be replaced with an "
-            "expanding-window version that only uses data available up to each row's own date.\n"
+            "## Note: `long_term_slope_m_per_year` is an expanding-window feature\n\n"
+            "Each row's value is fit using only that well's readings strictly BEFORE that row's own "
+            "date -- never the row's own reading or any later one. This makes it safe to use as a "
+            "training feature (no look-ahead). An earlier version of this script computed one "
+            "full-history slope per well and copied it onto every row for that well, which *was* "
+            "look-ahead bias (rows near the start of a well's record would have `seen` its future "
+            "decline). That bug was caught and fixed before any model was trained on this table -- "
+            "worth knowing about since it's the kind of mistake that silently inflates offline "
+            "accuracy without showing up until deployment.\n"
         )
 
     print(f"Wrote {DOCS_PATH}")
