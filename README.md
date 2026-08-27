@@ -61,7 +61,7 @@ until this section says otherwise.
 - [x] Data cleaning pipeline (`src/data/clean_cgwb_data.py`) — wide-to-long, type coercion, implausible-value filtering
 - [x] First-pass EDA / sufficiency audit (`src/eda/data_audit.py`)
 - [x] Deeper EDA & statistical analysis (`docs/EDA_FINDINGS.md`: seasonality, site-type effects, spatial autocorrelation)
-- [ ] Feature engineering
+- [x] Feature engineering (`src/features/build_features.py`, `docs/FEATURES.md`) -- note: `long_term_slope_m_per_year` has a known look-ahead-bias caveat to fix before training (see docs/FEATURES.md)
 - [ ] Baseline forecast (naive/seasonal-naive, per well and per district)
 - [ ] ML/time-series model(s) and comparison against baseline
 - [ ] Evaluation (backtested MAE/RMSE against baseline, by district)
@@ -84,6 +84,7 @@ docs/
   DATA_SOURCES.md           exact data provenance, credibility, quality issues
   DATA_AUDIT.md             generated: coverage stats, first trend check
   EDA_FINDINGS.md           generated: seasonality, site-type effects, spatial autocorrelation
+  FEATURES.md               generated: feature table reference, coverage, look-ahead-bias caveat
 reports/figures/            generated plots referenced from docs/
 ```
 
@@ -97,4 +98,5 @@ python src/eda/data_audit.py             # writes docs/DATA_AUDIT.md + reports/f
 python src/eda/seasonality_analysis.py   # writes docs/EDA_FINDINGS.md (seasonality section)
 python src/eda/site_type_analysis.py     # writes docs/EDA_FINDINGS.md (site-type section)
 python src/eda/spatial_analysis.py       # writes docs/EDA_FINDINGS.md (spatial section)
+python src/features/build_features.py    # writes data/processed/features.csv + docs/FEATURES.md
 ```
