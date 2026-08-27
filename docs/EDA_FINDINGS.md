@@ -38,3 +38,24 @@ CGWB well readings come from physically different well types. Categories with fe
 **Findings:** dug wells (the large majority of the network, ~77% of readings) are shallow and relatively low-variance -- they track the near-surface water table closely. Bore and tube wells are markedly deeper, far noisier (tube wells have roughly 3x the standard deviation of dug wells), and swing more with the season, consistent with them tapping deeper, more heterogeneous aquifer layers rather than the shallow water table.
 
 **Modelling implication:** site type is a real confound, not just metadata -- it should be included as a feature (or used to fit separate models per type) rather than pooling all wells together, since a 'depth of 15m' means something different for a dug well (unusually deep, possibly concerning) than for a tube well (unremarkable). The high variance in tube wells also means their readings need more caution before being used to flag anomalies -- a single-well spike is far more likely to be normal noise there.
+
+## Spatial patterns
+
+Empirical variogram: for 2,000 randomly sampled wells (all with >=20 readings), every pairwise distance and the absolute difference in each well's average depth-to-water, binned by distance.
+
+| Distance range | Mean |depth difference| (m) | # pairs |
+|---|---|---|
+| 0-10 km | 4.00 | 330 |
+| 10-25 km | 4.66 | 1,698 |
+| 25-50 km | 5.45 | 5,131 |
+| 50-100 km | 5.93 | 17,640 |
+| 100-250 km | 6.73 | 99,459 |
+| 250-500 km | 6.86 | 263,611 |
+| 500-1000 km | 7.44 | 647,596 |
+| 1000-3000 km | 8.46 | 963,535 |
+
+![Spatial variogram](../reports/figures/spatial_variogram.png)
+
+**Finding:** wells within 10 km of each other differ in typical depth by 4.00 m on average, versus 8.46 m for wells over 1000 km apart -- a 2.1x difference. This is a clear, real spatial autocorrelation signal: nearby wells are systematically more similar than distant ones, consistent with them sharing the same local aquifer/soil geology, not random noise.
+
+**Modelling implication:** this justifies using spatial structure explicitly later -- e.g. a district- or neighbor-averaged feature, or spatial interpolation (kriging) to estimate conditions in gaps between monitoring wells -- rather than treating each well as an independent, unrelated time series. It also means a well with very few readings can reasonably borrow information from its geographic neighbors, which matters given how many wells in this dataset have short records (see `DATA_AUDIT.md`).

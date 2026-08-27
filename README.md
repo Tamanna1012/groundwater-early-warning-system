@@ -60,7 +60,7 @@ until this section says otherwise.
 - [x] Real data sourced, documented, and quality-audited — `docs/DATA_SOURCES.md`, `docs/DATA_AUDIT.md`
 - [x] Data cleaning pipeline (`src/data/clean_cgwb_data.py`) — wide-to-long, type coercion, implausible-value filtering
 - [x] First-pass EDA / sufficiency audit (`src/eda/data_audit.py`)
-- [ ] Deeper EDA & statistical analysis (seasonality, site-type effects, spatial autocorrelation)
+- [x] Deeper EDA & statistical analysis (`docs/EDA_FINDINGS.md`: seasonality, site-type effects, spatial autocorrelation)
 - [ ] Feature engineering
 - [ ] Baseline forecast (naive/seasonal-naive, per well and per district)
 - [ ] ML/time-series model(s) and comparison against baseline
@@ -83,6 +83,7 @@ docs/
   PROBLEM_STATEMENT.md      the real-world problem, evidence, stakeholders, gap in existing work
   DATA_SOURCES.md           exact data provenance, credibility, quality issues
   DATA_AUDIT.md             generated: coverage stats, first trend check
+  EDA_FINDINGS.md           generated: seasonality, site-type effects, spatial autocorrelation
 reports/figures/            generated plots referenced from docs/
 ```
 
@@ -91,6 +92,9 @@ reports/figures/            generated plots referenced from docs/
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python src/data/clean_cgwb_data.py   # writes data/processed/groundwater_levels_long.csv
-python src/eda/data_audit.py         # writes docs/DATA_AUDIT.md + reports/figures/*.png
+python src/data/clean_cgwb_data.py       # writes data/processed/groundwater_levels_long.csv
+python src/eda/data_audit.py             # writes docs/DATA_AUDIT.md + reports/figures/*.png
+python src/eda/seasonality_analysis.py   # writes docs/EDA_FINDINGS.md (seasonality section)
+python src/eda/site_type_analysis.py     # writes docs/EDA_FINDINGS.md (site-type section)
+python src/eda/spatial_analysis.py       # writes docs/EDA_FINDINGS.md (spatial section)
 ```
