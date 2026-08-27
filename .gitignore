@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+.DS_Store
+*.egg-info/
+.env
+
+# Generated/derived data - regenerate with src/data/clean_cgwb_data.py
+data/processed/
+data/raw/cgwb_official/
