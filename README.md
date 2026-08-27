@@ -65,7 +65,7 @@ until this section says otherwise.
 - [x] Baseline forecast (`src/models/baseline_forecast.py`, `docs/BASELINE_RESULTS.md`) -- seasonal-naive beats naive by 23.8% MAE nationally, but naive wins in 8/10 of the fastest-declining districts (trend dominates over season there); this is the bar (MAE 1.809m) any real model must clear
 - [x] ML/time-series model(s) and comparison against baseline (`src/models/ml_forecast.py`, `docs/ML_MODEL_RESULTS.md`) -- gradient boosting beats the best baseline by 11.6% MAE nationally (1.600m vs 1.809m), but only wins outright in 4/10 of the fastest-declining districts, likely due to small per-district sample sizes; this national-vs-district gap is unresolved and flagged for the evaluation stage
 - [x] Evaluation (`src/models/backtest_evaluation.py`, `docs/EVALUATION.md`) -- 7 independent walk-forward splits (2010-2016): gradient boosting beats the best baseline in **7/7** splits (mean +10.9%), confirming the national result is real, not a one-split fluke. But the district-level gap is also confirmed, not resolved: only a **38% win rate** (19/50) in the fastest-declining districts across all splits -- a genuine, documented limitation to carry into explainability/actionable-output, not solved yet
-- [ ] Explainability
+- [x] Explainability (`src/models/explainability.py`, `docs/EXPLAINABILITY.md`) -- caught SHAP TreeExplainer AND sklearn's default partial-dependence method both giving wrong results for this model (native-categorical-split incompatibility), switched to permutation importance + brute-force partial dependence instead; found the model is systematically too optimistic (under-predicts depth) in 7/10 fastest-declining districts, and traced it to a specific cause: `long_term_slope_m_per_year` has almost no marginal effect on predictions, so wells whose only warning sign is a steep trend (not yet reflected in recent absolute readings) are the cases it misses worst
 - [ ] Actionable output: district-level risk map + forecast
 - [ ] Dashboard
 - [ ] Deployment
@@ -88,6 +88,7 @@ docs/
   BASELINE_RESULTS.md       generated: naive vs seasonal-naive backtest, overall/season/district
   ML_MODEL_RESULTS.md       generated: Ridge + gradient boosting vs baselines, feature importance, district check
   EVALUATION.md             generated: 7-split walk-forward backtest, national + district-level consistency check
+  EXPLAINABILITY.md         generated: permutation importance, partial dependence, district bias diagnostic, case study
 reports/figures/            generated plots referenced from docs/
 ```
 
@@ -105,4 +106,5 @@ python src/features/build_features.py    # writes data/processed/features.csv + 
 python src/models/baseline_forecast.py   # writes docs/BASELINE_RESULTS.md + reports/figures/baseline_comparison.png
 python src/models/ml_forecast.py         # writes docs/ML_MODEL_RESULTS.md + reports/figures/model_comparison.png
 python src/models/backtest_evaluation.py # writes docs/EVALUATION.md + reports/figures/backtest_mae_by_year.png
+python src/models/explainability.py      # writes docs/EXPLAINABILITY.md + reports/figures/partial_dependence.png
 ```
