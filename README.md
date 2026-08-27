@@ -62,7 +62,7 @@ until this section says otherwise.
 - [x] First-pass EDA / sufficiency audit (`src/eda/data_audit.py`)
 - [x] Deeper EDA & statistical analysis (`docs/EDA_FINDINGS.md`: seasonality, site-type effects, spatial autocorrelation)
 - [x] Feature engineering (`src/features/build_features.py`, `docs/FEATURES.md`) -- note: `long_term_slope_m_per_year` has a known look-ahead-bias caveat to fix before training (see docs/FEATURES.md)
-- [ ] Baseline forecast (naive/seasonal-naive, per well and per district)
+- [x] Baseline forecast (`src/models/baseline_forecast.py`, `docs/BASELINE_RESULTS.md`) -- seasonal-naive beats naive by 23.8% MAE nationally, but naive wins in 8/10 of the fastest-declining districts (trend dominates over season there); this is the bar (MAE 1.809m) any real model must clear
 - [ ] ML/time-series model(s) and comparison against baseline
 - [ ] Evaluation (backtested MAE/RMSE against baseline, by district)
 - [ ] Explainability
@@ -85,6 +85,7 @@ docs/
   DATA_AUDIT.md             generated: coverage stats, first trend check
   EDA_FINDINGS.md           generated: seasonality, site-type effects, spatial autocorrelation
   FEATURES.md               generated: feature table reference, coverage, look-ahead-bias caveat
+  BASELINE_RESULTS.md       generated: naive vs seasonal-naive backtest, overall/season/district
 reports/figures/            generated plots referenced from docs/
 ```
 
@@ -99,4 +100,5 @@ python src/eda/seasonality_analysis.py   # writes docs/EDA_FINDINGS.md (seasonal
 python src/eda/site_type_analysis.py     # writes docs/EDA_FINDINGS.md (site-type section)
 python src/eda/spatial_analysis.py       # writes docs/EDA_FINDINGS.md (spatial section)
 python src/features/build_features.py    # writes data/processed/features.csv + docs/FEATURES.md
+python src/models/baseline_forecast.py   # writes docs/BASELINE_RESULTS.md + reports/figures/baseline_comparison.png
 ```
