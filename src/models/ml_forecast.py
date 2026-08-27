@@ -28,13 +28,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
-from sklearn.linear_model import Ridge
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+
+from _model_utils import CATEGORICAL_FEATURES, FEATURE_COLS, NUMERIC_FEATURES, TARGET, fit_and_predict_both, predict_gbm
 
 ROOT = Path(__file__).resolve().parents[2]
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
@@ -42,13 +38,6 @@ DOCS_PATH = ROOT / "docs" / "ML_MODEL_RESULTS.md"
 FIG_DIR = ROOT / "reports" / "figures"
 
 TEST_CUTOFF = "2014-01-01"  # matches src/models/baseline_forecast.py exactly
-
-NUMERIC_FEATURES = [
-    "depth_last_reading", "depth_same_quarter_last_year", "rolling_mean_4",
-    "long_term_slope_m_per_year", "neighbor_mean_depth", "n_prior_readings", "lat", "lon",
-]
-CATEGORICAL_FEATURES = ["season", "site_type", "state"]
-TARGET = "depth_to_water_m"
 
 WORST_DISTRICTS = [  # same list as src/models/baseline_forecast.py, from docs/DATA_AUDIT.md
     ("HR", "Kurukshetra"), ("RJ", "Sikar"), ("RJ", "Dausa"), ("RJ", "Jhunjhunun"),
@@ -89,31 +78,11 @@ def main() -> None:
     train = df[df["date"] < TEST_CUTOFF]
     test = build_eval_set(df)
 
-    feature_cols = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-    X_train, y_train = train[feature_cols], train[TARGET]
-    X_test, y_test = test[feature_cols], test[TARGET]
+    X_test, y_test = test[FEATURE_COLS], test[TARGET]
 
-    # --- Ridge regression ---
-    ridge_pipeline = Pipeline([
-        ("preprocess", ColumnTransformer([
-            ("num", SimpleImputer(strategy="median"), NUMERIC_FEATURES),
-            ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
-        ])),
-        ("model", Ridge(alpha=1.0)),
-    ])
-    ridge_pipeline.fit(X_train, y_train)
-    ridge_pred = ridge_pipeline.predict(X_test)
-
-    # --- Gradient boosting (handles missing values + categoricals natively) ---
-    X_train_gbm = X_train.copy()
-    X_test_gbm = X_test.copy()
-    for c in CATEGORICAL_FEATURES:
-        X_train_gbm[c] = X_train_gbm[c].astype("category")
-        X_test_gbm[c] = X_test_gbm[c].astype("category").cat.set_categories(X_train_gbm[c].cat.categories)
-
-    gbm = HistGradientBoostingRegressor(categorical_features="from_dtype", random_state=42)
-    gbm.fit(X_train_gbm, y_train)
-    gbm_pred = gbm.predict(X_test_gbm)
+    fitted = fit_and_predict_both(train, test)
+    ridge_pred, gbm_pred = fitted["ridge"], fitted["gbm"]
+    gbm, X_test_gbm = fitted["gbm_model"], fitted["X_test_gbm"]
 
     results = {
         "Naive": BASELINE_MAE["Naive"],
@@ -163,7 +132,7 @@ def main() -> None:
     perm_sample = X_test_gbm.sample(n=min(5000, len(X_test_gbm)), random_state=42)
     perm_sample_y = y_test.loc[perm_sample.index]
     perm_result = permutation_importance(gbm, perm_sample, perm_sample_y, n_repeats=5, random_state=42, scoring="neg_mean_absolute_error")
-    importances = pd.Series(perm_result.importances_mean, index=feature_cols).sort_values(ascending=False)
+    importances = pd.Series(perm_result.importances_mean, index=FEATURE_COLS).sort_values(ascending=False)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
     names = list(results.keys())
