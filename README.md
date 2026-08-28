@@ -5,6 +5,10 @@ where the water table is falling fastest, using real monitoring-well data from t
 Central Ground Water Board (CGWB), to support district-level decisions about where
 to restrict extraction or invest in recharge.
 
+**Live dashboard:** https://tamanna1012.github.io/groundwater-early-warning-system/
+(goes live once GitHub Pages is enabled -- see `docs/DEPLOYMENT.md`; until then, open
+`dashboard/index.html` directly, no setup needed).
+
 ## The problem
 
 Large parts of north-western India are extracting groundwater faster than it is
@@ -68,7 +72,7 @@ until this section says otherwise.
 - [x] Explainability (`src/models/explainability.py`, `docs/EXPLAINABILITY.md`) -- caught SHAP TreeExplainer AND sklearn's default partial-dependence method both giving wrong results for this model (native-categorical-split incompatibility), switched to permutation importance + brute-force partial dependence instead; found the model is systematically too optimistic (under-predicts depth) in 7/10 fastest-declining districts, and traced it to a specific cause: `long_term_slope_m_per_year` has almost no marginal effect on predictions, so wells whose only warning sign is a steep trend (not yet reflected in recent absolute readings) are the cases it misses worst
 - [x] Actionable output: district-level risk map + forecast (`src/output/risk_score.py`, `docs/RISK_ASSESSMENT.md`) -- ranks 499 districts by a deliberately-weighted risk score (40% measured severity + 40% measured trend + 20% model forecast, weighted this way *because* of the explainability findings above), with a top-20 priority chart and a geographic bubble map whose hotspot visibly matches the known NW-India over-exploited belt; 8/10 previously-flagged model-bias districts land in the top 20, a real consistency check
 - [x] Dashboard (`src/output/build_dashboard.py` &rarr; `dashboard/index.html`) -- a single, self-contained interactive HTML file (Plotly embedded inline, no CDN, no server): an interactive bubble map, a top-40 priority chart, and a sortable/filterable table of all 499 districts. Verified with a headless-browser test (zero console errors, search/sort/filter all checked against real interaction, not just visual inspection) before committing
-- [ ] Deployment
+- [x] Deployment (`.github/workflows/deploy-pages.yml`, `docs/DEPLOYMENT.md`) -- auto-deploys `dashboard/index.html` to GitHub Pages on every push. One manual step outside this project's reach: a repo admin must set Settings &rarr; Pages &rarr; Source to "GitHub Actions" once; after that it's automatic
 
 ## Repo layout
 
