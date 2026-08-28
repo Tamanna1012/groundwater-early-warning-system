@@ -67,7 +67,7 @@ until this section says otherwise.
 - [x] Evaluation (`src/models/backtest_evaluation.py`, `docs/EVALUATION.md`) -- 7 independent walk-forward splits (2010-2016): gradient boosting beats the best baseline in **7/7** splits (mean +10.9%), confirming the national result is real, not a one-split fluke. But the district-level gap is also confirmed, not resolved: only a **38% win rate** (19/50) in the fastest-declining districts across all splits -- a genuine, documented limitation to carry into explainability/actionable-output, not solved yet
 - [x] Explainability (`src/models/explainability.py`, `docs/EXPLAINABILITY.md`) -- caught SHAP TreeExplainer AND sklearn's default partial-dependence method both giving wrong results for this model (native-categorical-split incompatibility), switched to permutation importance + brute-force partial dependence instead; found the model is systematically too optimistic (under-predicts depth) in 7/10 fastest-declining districts, and traced it to a specific cause: `long_term_slope_m_per_year` has almost no marginal effect on predictions, so wells whose only warning sign is a steep trend (not yet reflected in recent absolute readings) are the cases it misses worst
 - [x] Actionable output: district-level risk map + forecast (`src/output/risk_score.py`, `docs/RISK_ASSESSMENT.md`) -- ranks 499 districts by a deliberately-weighted risk score (40% measured severity + 40% measured trend + 20% model forecast, weighted this way *because* of the explainability findings above), with a top-20 priority chart and a geographic bubble map whose hotspot visibly matches the known NW-India over-exploited belt; 8/10 previously-flagged model-bias districts land in the top 20, a real consistency check
-- [ ] Dashboard
+- [x] Dashboard (`src/output/build_dashboard.py` &rarr; `dashboard/index.html`) -- a single, self-contained interactive HTML file (Plotly embedded inline, no CDN, no server): an interactive bubble map, a top-40 priority chart, and a sortable/filterable table of all 499 districts. Verified with a headless-browser test (zero console errors, search/sort/filter all checked against real interaction, not just visual inspection) before committing
 - [ ] Deployment
 
 ## Repo layout
@@ -81,7 +81,9 @@ src/
   eda/                     analysis scripts
   features/                feature engineering
   models/                  baseline, ML model, backtest evaluation, explainability
-  output/                  actionable output: district risk scoring
+  output/                  actionable output: district risk scoring + dashboard builder
+dashboard/
+  index.html               generated: self-contained interactive dashboard (open directly in a browser)
 docs/
   PROBLEM_STATEMENT.md      the real-world problem, evidence, stakeholders, gap in existing work
   DATA_SOURCES.md           exact data provenance, credibility, quality issues
@@ -112,4 +114,5 @@ python src/models/ml_forecast.py         # writes docs/ML_MODEL_RESULTS.md + rep
 python src/models/backtest_evaluation.py # writes docs/EVALUATION.md + reports/figures/backtest_mae_by_year.png
 python src/models/explainability.py      # writes docs/EXPLAINABILITY.md + reports/figures/partial_dependence.png
 python src/output/risk_score.py          # writes docs/RISK_ASSESSMENT.md + reports/figures/district_risk_ranking.png + risk_map.png
+python src/output/build_dashboard.py     # writes dashboard/index.html -- open it directly in a browser
 ```
