@@ -13,16 +13,27 @@ step, no environment variables, nothing to run.
 Pages automatically on every push to `main` or this project's working
 branch, using GitHub's official `actions/deploy-pages` action.
 
-**One manual step is required and cannot be done from inside this
-repository or any tool this project has access to:** a repository admin
-must go to **Settings -> Pages -> Build and deployment -> Source** and
-select **"GitHub Actions"**. This is a one-time toggle; every push after
-that deploys automatically, and the workflow reports the live URL in its
-run summary (Actions tab -> the latest "Deploy dashboard to GitHub Pages"
-run -> the `deploy` job's `page_url` output).
+**Live at:** `https://tamanna1012.github.io/groundwater-early-warning-system/`
 
-Once enabled, the dashboard will be live at:
-`https://tamanna1012.github.io/groundwater-early-warning-system/`
+### One-time setup (already done for this repo, documented for reproducing elsewhere)
+
+A repository admin must go to **Settings -> Pages -> Build and deployment
+-> Source** and select **"GitHub Actions"**. This is a one-time toggle;
+every push after that deploys automatically.
+
+**Gotcha we actually hit, worth knowing about:** GitHub Pages ships with
+two independent deployment systems that can both be "on" at once --
+the classic one (**"Deploy from a branch"**, Jekyll-based, defaults to
+serving the repo's `README.md` as the site if it finds no `index.html` at
+the branch root) and the one this project uses (**"GitHub Actions"**,
+which deploys whatever `actions/deploy-pages` uploads -- `dashboard/`
+here). If Source reverts to or defaults to "Deploy from a branch," the
+live site silently serves the raw README instead of the dashboard, with
+no error anywhere -- the Actions workflow still reports success, because
+it did successfully upload the artifact; it's the *Source* setting that
+decides which system actually serves traffic. If the live URL ever shows
+README text instead of the dashboard, check Settings -> Pages -> Source
+first, not the workflow.
 
 ## Why not something else
 
