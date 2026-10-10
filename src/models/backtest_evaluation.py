@@ -79,12 +79,26 @@ def run_split(df: pd.DataFrame, test_year: int) -> dict:
         district_total += 1
         district_wins += district_gbm_mae < district_best_baseline
 
+    # The same check over EVERY district, not just the fastest-declining ten.
+    # Without it there is no way to read the number above: a low win rate in
+    # those ten could mean the model is weak at district level generally, or
+    # weak only there, and those have very different consequences for a
+    # system whose whole purpose is ranking districts.
+    all_wins, all_total = 0, 0
+    for _, sub in per_row.groupby(["state", "district"], observed=True):
+        if len(sub) < MIN_DISTRICT_N:
+            continue
+        sub_best_baseline = min(mae(sub["actual"], sub["naive"]), mae(sub["actual"], sub["seasonal_naive"]))
+        all_total += 1
+        all_wins += mae(sub["actual"], sub["gbm"]) < sub_best_baseline
+
     return {
         "test_year": test_year, "n_train": len(train), "n_test": len(test),
         "naive_mae": naive_mae, "seasonal_mae": seasonal_mae, "best_baseline_mae": best_baseline,
         "ridge_mae": ridge_mae, "gbm_mae": gbm_mae,
         "gbm_improvement_pct": 100 * (best_baseline - gbm_mae) / best_baseline,
         "district_wins": district_wins, "district_total": district_total,
+        "all_district_wins": all_wins, "all_district_total": all_total,
     }
 
 
@@ -100,6 +114,8 @@ def main() -> None:
     n_splits_gbm_wins = int((results_df["gbm_mae"] < results_df["best_baseline_mae"]).sum())
     total_district_wins = int(results_df["district_wins"].sum())
     total_district_checks = int(results_df["district_total"].sum())
+    total_all_wins = int(results_df["all_district_wins"].sum())
+    total_all_checks = int(results_df["all_district_total"].sum())
 
     fig, ax = plt.subplots(figsize=(8, 4.5))
     ax.plot(results_df["test_year"], results_df["naive_mae"], marker="o", label="Naive", color="#8C8C8C", linestyle="--")
@@ -177,12 +193,36 @@ def main() -> None:
                 "ML_MODEL_RESULTS.md suggested on its own.\n\n"
             )
 
+        all_rate = total_all_wins / total_all_checks if total_all_checks else float("nan")
+        f.write("## Is it weak at district level generally, or only in those ten?\n\n")
+        f.write(
+            f"The number above on its own is easy to over-read. Run the identical check over "
+            f"**every** district rather than the fastest-declining ten, and gradient boosting beats "
+            f"the best baseline in **{total_all_wins:,}/{total_all_checks:,}** (district, year) "
+            f"cells -- a {all_rate:.0%} win rate, against {win_rate:.0%} in those ten. "
+        )
+        f.write(
+            "Both numbers are real and they do not contradict each other; they are different "
+            "populations. The model is not weak at district level in general. It is weak "
+            f"*specifically* where the water table is falling fastest, winning about "
+            f"{100 * (all_rate - win_rate):.0f} percentage points less often there than in a typical "
+            "district. That is the precise form of the limitation, and the precise form matters: the "
+            "broad reading understates a model that is usually right, while the narrow reading is the "
+            "one that actually threatens the use case, because those are exactly the districts this "
+            "system exists to flag.\n\n"
+        )
+        f.write(
+            "`docs/DISTRICT_MODEL.md` follows this up by testing the most obvious explanation -- that "
+            "the model simply isn't told which district a well is in -- and rules it out.\n\n"
+        )
+
         f.write("## Honest conclusion\n\n")
         f.write(
             f"Gradient boosting is a genuine, backtested improvement over both simple baselines "
-            f"nationally ({mean_improvement:+.1f}% average across {len(TEST_YEARS)} independent splits). "
-            "Its advantage in the specific districts an early-warning system cares about most is real "
-            f"but weaker ({win_rate:.0%} win rate) and should be treated as an open limitation, not a "
+            f"nationally ({mean_improvement:+.1f}% average across {len(TEST_YEARS)} independent splits), "
+            f"and it holds up across districts in general ({all_rate:.0%} of all district-year cells). "
+            "Its advantage in the specific districts an early-warning system cares about most is the "
+            f"exception ({win_rate:.0%} win rate), and should be treated as an open limitation, not a "
             "solved problem, going into the explainability and actionable-output stages.\n"
         )
 
