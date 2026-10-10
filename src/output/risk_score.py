@@ -44,7 +44,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src" / "models"))  # for the shared _model_utils module
-from _model_utils import FEATURE_COLS, TARGET, as_categorical_frame, fit_gbm
+from _model_utils import FEATURE_COLS, TARGET, as_categorical_frame, fit_gbm, predict_interval
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
 DOCS_PATH = ROOT / "docs" / "RISK_ASSESSMENT.md"
 FIG_DIR = ROOT / "reports" / "figures"
@@ -158,12 +158,22 @@ def main() -> None:
     snapshot["predicted_next_depth"] = model.predict(X_forecast)
     snapshot["predicted_change"] = snapshot["predicted_next_depth"] - snapshot["current_depth"]
 
+    # How sure is the model about each of those forecasts? docs/UNCERTAINTY.md
+    # validates this interval on the same backtest the rest of the evaluation
+    # uses: it holds the actual reading 77% of the time against a nominal 80%,
+    # and its width tracks district-level error closely (r = 0.90), so it is
+    # a usable reliability signal rather than decoration.
+    print("Fitting prediction-interval models...")
+    lower, upper = predict_interval(X_train_gbm, y_full, X_forecast)
+    snapshot["forecast_interval_m"] = upper - lower
+
     # --- Aggregate to district level ---
     district = snapshot.groupby(["state", "district"]).agg(
         n_wells=("well_id", "size"),
         current_depth=("current_depth", "median"),
         measured_trend=("long_term_slope_m_per_year", "median"),
         predicted_change=("predicted_change", "median"),
+        forecast_interval_m=("forecast_interval_m", "median"),
         lat=("lat", "mean"),
         lon=("lon", "mean"),
     )
@@ -178,6 +188,16 @@ def main() -> None:
     district["known_model_bias_flag"] = [
         (s, d) in KNOWN_MODEL_BIAS_DISTRICTS for s, d in district.index
     ]
+
+    # Forecast confidence, as terciles of the interval width across districts.
+    # Deliberately NOT folded into risk_score: letting the model's confidence
+    # change the weighting per district would make two districts' scores
+    # incomparable, which defeats the point of a ranking. It is reported
+    # beside the score instead, so a user can see which forecasts to discount
+    # while still reading one consistently-constructed number.
+    district["forecast_confidence"] = pd.qcut(
+        district["forecast_interval_m"], 3, labels=["High", "Medium", "Low"]
+    ).astype(str)
 
     district = district.sort_values("risk_score", ascending=False).reset_index()
     district.insert(0, "rank", range(1, len(district) + 1))
@@ -253,15 +273,36 @@ def main() -> None:
         )
         f.write("## Top 20 priority districts\n\n")
         f.write("![District risk ranking](../reports/figures/district_risk_ranking.png)\n\n")
-        f.write("| Rank | State | District | Wells | Current depth (m) | Trend (m/yr) | Risk score | Flag |\n")
-        f.write("|---|---|---|---|---|---|---|---|\n")
+        f.write("| Rank | State | District | Wells | Current depth (m) | Trend (m/yr) | Risk score | Forecast confidence | Flag |\n")
+        f.write("|---|---|---|---|---|---|---|---|---|\n")
         for _, row in top20.iterrows():
             flag = "\\*" if row["known_model_bias_flag"] else ""
             f.write(
                 f"| {int(row['rank'])} | {row['state']} | {row['district']} | {int(row['n_wells'])} | "
-                f"{row['current_depth']:.2f} | {row['measured_trend']:+.3f} | {row['risk_score']:.1f} | {flag} |\n"
+                f"{row['current_depth']:.2f} | {row['measured_trend']:+.3f} | {row['risk_score']:.1f} | "
+                f"{row['forecast_confidence']} ({row['forecast_interval_m']:.1f} m) | {flag} |\n"
             )
         f.write(f"\nFull ranking for all {len(district)} qualifying districts: `data/processed/district_risk_scores.csv` (regenerate with `python src/output/risk_score.py`).\n\n")
+
+        low_conf_in_top20 = int((top20["forecast_confidence"] == "Low").sum())
+        f.write("### Reading the confidence column\n\n")
+        f.write(
+            "**Forecast confidence** is the width of the model's 80% prediction interval for that "
+            "district, bucketed into terciles across all districts (`High` = narrowest third). "
+            "`docs/UNCERTAINTY.md` validates it on the same backtest as the rest of the evaluation: "
+            "the interval holds the actual reading 77% of the time against a nominal 80%, and its "
+            "width tracks district-level error closely enough (r = 0.90) to be worth acting on -- "
+            "districts in the widest quartile are off by 2.71 m on average against 0.81 m in the "
+            "narrowest.\n\n"
+        )
+        f.write(
+            f"It is deliberately **not** folded into the risk score. Letting the model's confidence "
+            "change the weighting district by district would make two districts' scores incomparable, "
+            "which is the one thing a ranking cannot afford. It sits beside the score instead: "
+            f"{low_conf_in_top20} of the top 20 carry `Low` confidence, and for those the 20% "
+            "model-forecast component should be read as the weakest part of the number, with the "
+            "80% that comes from directly measured severity and trend carrying the weight.\n\n"
+        )
 
         f.write("## Geographic view\n\n")
         f.write("![Risk map](../reports/figures/risk_map.png)\n\n")

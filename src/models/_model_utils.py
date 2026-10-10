@@ -5,6 +5,7 @@ split first used in ml_forecast.py -- not two subtly different pipelines."""
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -54,6 +55,39 @@ def fit_gbm(X_train: pd.DataFrame, y_train: pd.Series, random_state: int = 42) -
 def predict_gbm(model: HistGradientBoostingRegressor, X_test: pd.DataFrame, X_train_gbm: pd.DataFrame):
     X_test_gbm = as_categorical_frame(X_test, reference=X_train_gbm)
     return model.predict(X_test_gbm)
+
+
+# Bounds of the prediction interval the project reports. Shared so that the
+# interval measured in src/models/uncertainty.py is the same interval shown
+# in src/output/risk_score.py -- an 80% interval that was validated and a
+# differently-sized one that gets published would be worse than none.
+QUANTILE_LOW, QUANTILE_HIGH = 0.1, 0.9
+
+
+def fit_quantile_gbm(
+    X_train_gbm: pd.DataFrame, y_train: pd.Series, quantile: float, random_state: int = 42
+) -> HistGradientBoostingRegressor:
+    """One bound of the prediction interval. Takes an already-categorical
+    frame (from fit_gbm) so the quantile models see exactly the features the
+    point model was fit on."""
+    model = HistGradientBoostingRegressor(
+        loss="quantile", quantile=quantile,
+        categorical_features="from_dtype", random_state=random_state,
+    )
+    model.fit(X_train_gbm, y_train)
+    return model
+
+
+def predict_interval(
+    X_train_gbm: pd.DataFrame, y_train: pd.Series, X_test_gbm: pd.DataFrame, random_state: int = 42
+):
+    """Lower and upper bounds for every row of X_test_gbm. The two quantile
+    models are fit independently, so nothing forces lower <= upper; where
+    they cross -- a sign the model has almost no signal for that row -- they
+    are ordered rather than returned as a negative-width interval."""
+    lower = fit_quantile_gbm(X_train_gbm, y_train, QUANTILE_LOW, random_state).predict(X_test_gbm)
+    upper = fit_quantile_gbm(X_train_gbm, y_train, QUANTILE_HIGH, random_state).predict(X_test_gbm)
+    return np.minimum(lower, upper), np.maximum(lower, upper)
 
 
 def fit_and_predict_both(train: pd.DataFrame, test: pd.DataFrame, random_state: int = 42) -> dict:

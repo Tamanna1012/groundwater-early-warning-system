@@ -41,6 +41,8 @@ def build_map_figure(df: pd.DataFrame) -> go.Figure:
         + "<br>Current depth: " + df["current_depth"].round(2).astype(str) + " m"
         + "<br>Trend: " + df["measured_trend"].round(3).astype(str) + " m/yr"
         + "<br>Wells: " + df["n_wells"].astype(str)
+        + "<br>Forecast confidence: " + df["forecast_confidence"].astype(str)
+        + " (" + df["forecast_interval_m"].round(1).astype(str) + " m interval)"
         + df["known_model_bias_flag"].map({True: "<br><b>* known model-bias district</b>", False: ""})
     )
     fig = go.Figure(
@@ -86,20 +88,34 @@ def build_bar_figure(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-TABLE_COLUMNS = ["rank", "state", "district", "n_wells", "current_depth", "measured_trend", "risk_score", "known_model_bias_flag"]
-TABLE_HEADERS = ["Rank", "State", "District", "Wells", "Current depth (m)", "Trend (m/yr)", "Risk score", "Flag"]
-TABLE_TYPES = ["num", "str", "str", "num", "num", "num", "num", "str"]
+TABLE_COLUMNS = ["rank", "state", "district", "n_wells", "current_depth", "measured_trend", "risk_score", "forecast_confidence", "known_model_bias_flag"]
+TABLE_HEADERS = ["Rank", "State", "District", "Wells", "Current depth (m)", "Trend (m/yr)", "Risk score", "Forecast confidence", "Flag"]
+# The confidence column sorts as a number, not a string: sorting "High,
+# Low, Medium" alphabetically would put the least reliable forecasts in the
+# middle, which is the opposite of useful. The cell carries a data-sort
+# value so the column orders High -> Medium -> Low.
+TABLE_TYPES = ["num", "str", "str", "num", "num", "num", "num", "num", "str"]
+
+CONFIDENCE_ORDER = {"High": 0, "Medium": 1, "Low": 2}
+CONFIDENCE_CLASS = {"High": "conf-high", "Medium": "conf-med", "Low": "conf-low"}
 
 
 def build_table_rows(df: pd.DataFrame) -> str:
     rows = []
     for _, r in df.iterrows():
         flag = "&#9888;" if r["known_model_bias_flag"] else ""
+        conf = str(r["forecast_confidence"])
+        conf_cell = (
+            f'<td data-sort="{CONFIDENCE_ORDER.get(conf, 9)}">'
+            f'<span class="{CONFIDENCE_CLASS.get(conf, "")}" '
+            f'title="80% prediction interval is {r["forecast_interval_m"]:.1f} m wide">{conf}</span></td>'
+        )
         rows.append(
             "<tr>"
             f"<td>{int(r['rank'])}</td><td>{r['state']}</td><td>{r['district']}</td>"
             f"<td>{int(r['n_wells'])}</td><td>{r['current_depth']:.2f}</td>"
-            f"<td>{r['measured_trend']:+.3f}</td><td>{r['risk_score']:.1f}</td><td>{flag}</td>"
+            f"<td>{r['measured_trend']:+.3f}</td><td>{r['risk_score']:.1f}</td>"
+            f"{conf_cell}<td>{flag}</td>"
             "</tr>"
         )
     return "\n".join(rows)
@@ -147,6 +163,18 @@ HTML_TEMPLATE = """<!doctype html>
   th:hover {{ background: #ece9e0; }}
   tbody tr:hover {{ background: #fbf6ef; }}
   .table-wrap {{ max-height: 520px; overflow-y: auto; border-radius: 8px; }}
+  /* Forecast confidence. Deliberately not a red/amber/green scale: the risk
+     score beside it is already on a red scale, and two different meanings
+     sharing one colour language in the same row invites misreading "Low
+     confidence" as "low risk". These are neutral greys and blues, with the
+     text carrying the meaning. */
+  .conf-high, .conf-med, .conf-low {{
+    display: inline-block; padding: 1px 8px; border-radius: 10px;
+    font-size: 0.78rem; border: 1px solid transparent; cursor: help;
+  }}
+  .conf-high {{ background: #eef3fb; border-color: #cddcf0; color: #27456d; }}
+  .conf-med {{ background: #f4f2ec; border-color: #e3e1db; color: #5b6069; }}
+  .conf-low {{ background: #f7f7f7; border-color: #e0e0e0; color: #8a8f96; }}
   .flag-note {{ font-size: 0.78rem; color: var(--muted); margin-top: 8px; }}
   footer {{ max-width: 1100px; margin: 40px auto 0; padding: 0 24px; color: var(--muted); font-size: 0.82rem; line-height: 1.6; }}
   footer a {{ color: var(--accent); }}
@@ -198,6 +226,7 @@ HTML_TEMPLATE = """<!doctype html>
       </table>
     </div>
     <div class="flag-note">&#9888; = known model-bias district (docs/EVALUATION.md / docs/EXPLAINABILITY.md): treat its risk score as a floor, not a ceiling.</div>
+    <div class="flag-note"><b>Forecast confidence</b> = how wide the model's 80% prediction interval is for that district, in terciles across all districts (hover a badge for the width in metres). It describes the 20% model-forecast part of the score only &mdash; the other 80% comes from directly measured depth and trend, which a low-confidence forecast does not weaken. Validated in docs/UNCERTAINTY.md.</div>
   </div>
 </section>
 
@@ -220,7 +249,12 @@ function sortTable(colIndex) {{
   sortState = {{ col: colIndex, dir: dir }};
   const type = columnTypes[colIndex];
   rows.sort((a, b) => {{
-    let av = a.cells[colIndex].innerText, bv = b.cells[colIndex].innerText;
+    const ac = a.cells[colIndex], bc = b.cells[colIndex];
+    // A cell may carry an explicit data-sort value when what it displays is
+    // not what it should sort by -- the confidence column shows High/Medium/
+    // Low but has to order by reliability, not alphabetically.
+    let av = ac.dataset.sort !== undefined ? ac.dataset.sort : ac.innerText;
+    let bv = bc.dataset.sort !== undefined ? bc.dataset.sort : bc.innerText;
     if (type === "num") {{ av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; return dir * (av - bv); }}
     return dir * av.localeCompare(bv);
   }});
