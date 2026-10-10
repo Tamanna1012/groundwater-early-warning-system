@@ -1,8 +1,7 @@
 name: Deploy dashboard to GitHub Pages
 
 # Publishes dashboard/index.html (a single, self-contained static file --
-# see src/output/build_dashboard.py) to GitHub Pages on every push to
-# main or this project's working branch.
+# see src/output/build_dashboard.py) to GitHub Pages on every push to main.
 #
 # One-time manual step required (not doable via this workflow, or any
 # API this project has access to): in the repo's Settings -> Pages,
@@ -11,7 +10,7 @@ name: Deploy dashboard to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/real-world-ds-project-vvoj8c]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

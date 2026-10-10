@@ -6,7 +6,7 @@
 
 District risk score = 40% current severity + 40% measured historical trend + 20% model-forecasted next-quarter change (each as a 0-100 percentile rank across 499 districts with at least 5 monitored wells). The weighting is deliberate, not arbitrary: `docs/EXPLAINABILITY.md` found the model is systematically too optimistic and barely uses the trend feature on its own, so this score leans on two directly-measured, model-independent signals (severity, trend) and treats the model's forecast as a smaller, confirming input -- not the primary driver.
 
-**10 districts (marked \*) are ones where `docs/EVALUATION.md`/`docs/EXPLAINABILITY.md` specifically found the model under-predicts severity** -- 8 of them appear in the top 20 below. For these, treat the risk score as a floor, not a ceiling: the real situation is more likely to be *worse* than scored than better.
+**10 districts (marked \*) are ones where `docs/EVALUATION.md`/`docs/EXPLAINABILITY.md` specifically found the model under-predicts severity** -- 7 of them appear in the top 20 below. For these, treat the risk score as a floor, not a ceiling: the real situation is more likely to be *worse* than scored than better.
 
 ## Top 20 priority districts
 
@@ -14,26 +14,26 @@ District risk score = 40% current severity + 40% measured historical trend + 20%
 
 | Rank | State | District | Wells | Current depth (m) | Trend (m/yr) | Risk score | Flag |
 |---|---|---|---|---|---|---|---|
-| 1 | MP | Morena | 23 | 15.65 | +0.647 | 94.3 |  |
-| 2 | GJ | Banas Kantha | 120 | 22.05 | +0.307 | 92.8 | \* |
-| 3 | RJ | Jaipur | 118 | 33.65 | +0.920 | 92.3 | \* |
-| 4 | HR | Karnal | 125 | 16.75 | +0.437 | 90.6 |  |
-| 5 | RJ | Jhunjhunun | 40 | 53.15 | +0.713 | 90.5 | \* |
-| 6 | MP | Bhind | 29 | 17.40 | +0.146 | 90.5 |  |
-| 7 | RJ | Jodhpur | 100 | 28.15 | +0.143 | 89.8 |  |
-| 8 | RJ | Sikar | 70 | 43.23 | +0.790 | 88.6 | \* |
-| 9 | MP | Gwalior | 32 | 11.65 | +0.310 | 88.3 |  |
-| 10 | RJ | Dausa | 45 | 23.26 | +0.935 | 88.1 | \* |
-| 11 | WB | Purba Medinipur | 83 | 11.37 | +0.381 | 88.0 |  |
-| 12 | GJ | Gandhinagar | 35 | 89.76 | +0.193 | 87.4 |  |
-| 13 | TG | Medak | 109 | 11.31 | +0.115 | 87.1 |  |
-| 14 | RJ | Alwar | 77 | 21.20 | +0.742 | 86.5 | \* |
-| 15 | MP | Ratlam | 67 | 15.30 | +0.105 | 85.7 |  |
-| 16 | HR | Mahendragarh | 37 | 26.02 | +0.696 | 84.3 |  |
-| 17 | HR | Gurgaon | 49 | 21.75 | +0.631 | 84.1 | \* |
-| 18 | PB | Patiala | 67 | 19.13 | +0.473 | 83.5 |  |
-| 19 | PB | Sangrur | 48 | 27.24 | +0.853 | 83.2 | \* |
-| 20 | TG | Nizamabad | 96 | 7.97 | +0.206 | 83.2 |  |
+| 1 | RJ | Jhunjhunun | 40 | 53.15 | +0.713 | 92.5 | \* |
+| 2 | MP | Morena | 23 | 15.65 | +0.647 | 91.9 |  |
+| 3 | GJ | Banas Kantha | 120 | 22.05 | +0.307 | 91.7 | \* |
+| 4 | RJ | Jodhpur | 100 | 28.15 | +0.143 | 90.4 |  |
+| 5 | WB | Purba Medinipur | 83 | 11.37 | +0.381 | 89.8 |  |
+| 6 | RJ | Jaipur | 118 | 33.65 | +0.920 | 89.1 | \* |
+| 7 | MP | Gwalior | 32 | 11.65 | +0.310 | 88.1 |  |
+| 8 | HR | Karnal | 125 | 16.75 | +0.437 | 87.9 |  |
+| 9 | RJ | Alwar | 77 | 21.20 | +0.742 | 87.8 | \* |
+| 10 | TG | Medak | 109 | 11.31 | +0.115 | 87.2 |  |
+| 11 | RJ | Sikar | 70 | 43.23 | +0.790 | 86.3 | \* |
+| 12 | MP | Bhind | 29 | 17.40 | +0.146 | 85.8 |  |
+| 13 | PB | Sangrur | 48 | 27.24 | +0.853 | 84.9 | \* |
+| 14 | PB | Patiala | 67 | 19.13 | +0.473 | 84.4 |  |
+| 15 | UP | Farrukhabad | 13 | 11.20 | +0.254 | 84.0 |  |
+| 16 | RJ | Dausa | 45 | 23.26 | +0.935 | 83.9 | \* |
+| 17 | UP | Gautam Buddha Nagar | 13 | 11.92 | +0.323 | 83.3 |  |
+| 18 | TG | Nizamabad | 96 | 7.97 | +0.206 | 83.2 |  |
+| 19 | MP | Ratlam | 67 | 15.30 | +0.105 | 82.6 |  |
+| 20 | TG | Rangareddy | 184 | 9.63 | +0.112 | 82.6 |  |
 
 Full ranking for all 499 qualifying districts: `data/processed/district_risk_scores.csv` (regenerate with `python src/output/risk_score.py`).
 

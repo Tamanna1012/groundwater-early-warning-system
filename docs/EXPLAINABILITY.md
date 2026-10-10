@@ -6,17 +6,17 @@
 
 | Feature | Permutation importance (MAE increase, m) |
 |---|---|
-| `rolling_mean_4` | 2.281 |
-| `depth_last_reading` | 0.721 |
-| `depth_same_quarter_last_year` | 0.471 |
-| `season` | 0.185 |
-| `neighbor_mean_depth` | 0.162 |
-| `state` | 0.062 |
-| `long_term_slope_m_per_year` | 0.055 |
-| `n_prior_readings` | 0.038 |
+| `rolling_mean_4` | 3.311 |
+| `depth_same_quarter_last_year` | 0.381 |
+| `depth_last_reading` | 0.284 |
+| `season` | 0.199 |
+| `neighbor_mean_depth` | 0.160 |
+| `state` | 0.096 |
+| `long_term_slope_m_per_year` | 0.053 |
+| `n_prior_readings` | 0.037 |
 | `lat` | 0.016 |
 | `lon` | 0.013 |
-| `site_type` | 0.012 |
+| `site_type` | 0.007 |
 
 Consistent with `docs/ML_MODEL_RESULTS.md`: recent readings (`rolling_mean_4`, `depth_last_reading`) and the seasonal comparison (`depth_same_quarter_last_year`) dominate.
 
@@ -28,26 +28,26 @@ Three curves rise clearly and monotonically, as expected: a well with a higher r
 
 ## Why does it struggle in the fastest-declining districts?
 
-National mean error (actual - predicted): **+0.264m**. Per fastest-declining district:
+National mean error (actual - predicted): **+0.244m**. Per fastest-declining district:
 
 | State | District | Mean error (actual - predicted) | MAE | n |
 |---|---|---|---|---|
-| GJ | Banas Kantha | +0.972 | 7.130 | 493 |
-| RJ | Dausa | +0.937 | 2.709 | 143 |
-| RJ | Jhunjhunun | +0.487 | 3.075 | 166 |
-| PB | Sangrur | +0.468 | 1.276 | 147 |
-| HR | Kurukshetra | +0.358 | 2.268 | 119 |
-| PB | Barnala | +0.326 | 1.111 | 71 |
-| HR | Gurgaon | +0.149 | 1.479 | 53 |
-| RJ | Jaipur | -0.193 | 2.857 | 375 |
-| RJ | Alwar | -0.249 | 2.452 | 319 |
-| RJ | Sikar | -0.253 | 3.037 | 318 |
+| RJ | Dausa | +0.795 | 2.675 | 143 |
+| GJ | Banas Kantha | +0.750 | 7.021 | 493 |
+| PB | Barnala | +0.287 | 1.193 | 71 |
+| HR | Gurgaon | +0.237 | 1.469 | 53 |
+| PB | Sangrur | +0.229 | 1.253 | 147 |
+| HR | Kurukshetra | +0.194 | 2.347 | 119 |
+| RJ | Jhunjhunun | -0.245 | 3.308 | 166 |
+| RJ | Jaipur | -0.248 | 2.925 | 375 |
+| RJ | Alwar | -0.340 | 2.367 | 319 |
+| RJ | Sikar | -0.387 | 3.228 | 318 |
 
-**7/10 of these districts have a positive mean error** -- actual depth is greater than predicted, i.e. the model is systematically *too optimistic* in most of the districts that matter most: it under-predicts how deep the water table actually gets, the wrong direction of error for an early-warning system (better to overstate severity than miss a genuine worsening). Consistent with a model trained mostly on the national mix of stable/slowly-changing wells regressing fast-decliners toward typical behavior rather than fully extrapolating their unusually steep local trend.
+**6/10 of these districts have a positive mean error** -- actual depth is greater than predicted, i.e. the model is systematically *too optimistic* in most of the districts that matter most: it under-predicts how deep the water table actually gets, the wrong direction of error for an early-warning system (better to overstate severity than miss a genuine worsening). Consistent with a model trained mostly on the national mix of stable/slowly-changing wells regressing fast-decliners toward typical behavior rather than fully extrapolating their unusually steep local trend.
 
 ## A concrete example (local explainability)
 
-The largest under-prediction *within the fastest-declining districts*: a well in **Banas Kantha, GJ**, actual depth 106.40m, predicted 19.68m (model was 86.72m too shallow). For context, this well's own feature values versus its 492 district peers in the test set:
+The largest under-prediction *within the fastest-declining districts*: a well in **Banas Kantha, GJ**, actual depth 106.40m, predicted 21.83m (model was 84.57m too shallow). For context, this well's own feature values versus its 492 district peers in the test set:
 
 | Feature | This well | District median (other wells) |
 |---|---|---|

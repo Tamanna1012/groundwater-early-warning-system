@@ -1,0 +1,23 @@
+name: Tests
+
+# Runs the pytest suite in tests/ on every push and pull request. The suite
+# needs no data: it builds small synthetic frames, so it runs in seconds and
+# does not depend on data/processed/ (which is gitignored and regenerated).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: pytest -q

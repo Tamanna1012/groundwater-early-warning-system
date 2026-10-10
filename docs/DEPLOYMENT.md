@@ -10,8 +10,8 @@ step, no environment variables, nothing to run.
 ## GitHub Pages (this project's chosen path)
 
 `.github/workflows/deploy-pages.yml` publishes `dashboard/` to GitHub
-Pages automatically on every push to `main` or this project's working
-branch, using GitHub's official `actions/deploy-pages` action.
+Pages automatically on every push to `main`, using GitHub's official
+`actions/deploy-pages` action.
 
 **Live at:** `https://tamanna1012.github.io/groundwater-early-warning-system/`
 

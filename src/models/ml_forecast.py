@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 from sklearn.inspection import permutation_importance
 
-from _model_utils import CATEGORICAL_FEATURES, FEATURE_COLS, NUMERIC_FEATURES, TARGET, fit_and_predict_both, predict_gbm
+from _model_utils import CATEGORICAL_FEATURES, FEATURE_COLS, NUMERIC_FEATURES, TARGET, fit_and_predict_both
 
 ROOT = Path(__file__).resolve().parents[2]
 FEATURES_PATH = ROOT / "data" / "processed" / "features.csv"
@@ -196,8 +196,9 @@ def main() -> None:
         f.write(
             "\nImportance = how much MAE gets worse when that column is randomly shuffled (bigger = "
             "more relied on). This is a first look using scikit-learn's permutation importance, not "
-            "the formal explainability stage still to come in the pipeline (which will go further -- "
-            "per-prediction explanations via SHAP, not just an overall ranking) -- but it already "
+            "the formal explainability stage still to come in the pipeline (which goes further -- "
+            "see docs/EXPLAINABILITY.md, which also documents why SHAP's TreeExplainer turned out to "
+            "be unusable for this particular model) -- but it already "
             "confirms the model leans on sensible signals (recent readings and trend dominate) rather "
             "than something spurious.\n\n"
         )

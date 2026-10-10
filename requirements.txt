@@ -1,7 +1,7 @@
-pandas>=2.0
+pandas>=2.2        # groupby.apply(include_groups=...) in src/output/risk_score.py
 numpy>=1.24
 matplotlib>=3.7
 requests>=2.31
 scipy>=1.11
-scikit-learn>=1.3
+scikit-learn>=1.4  # HistGradientBoostingRegressor(categorical_features="from_dtype")
 plotly>=5.20

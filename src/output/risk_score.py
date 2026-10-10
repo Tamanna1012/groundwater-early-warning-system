@@ -50,6 +50,8 @@ DOCS_PATH = ROOT / "docs" / "RISK_ASSESSMENT.md"
 FIG_DIR = ROOT / "reports" / "figures"
 OUT_CSV = ROOT / "data" / "processed" / "district_risk_scores.csv"
 
+SLOPE_EPOCH_YEAR = 1996  # must match src/features/build_features.py
+
 MIN_WELLS_PER_DISTRICT = 5
 N_NEIGHBORS = 5
 MONTH_MAP = {"Jan": 1, "May": 5, "Aug": 8, "Nov": 11}
@@ -72,9 +74,14 @@ def next_quarter_date(last_date: pd.Timestamp) -> pd.Timestamp:
 
 
 def well_full_history_slope(dates: pd.Series, depths: pd.Series) -> float:
+    """Full-history trend (m/year) for one well. Uses the same epoch-shifted
+    time axis as src/features/build_features.py (SLOPE_EPOCH_YEAR) so the
+    serving-time slope is numerically identical to the training-time one --
+    a constant shift cannot change a slope, but fitting against raw calendar
+    years is badly conditioned and loses precision."""
     if dates.nunique() < 3:
         return np.nan
-    x = dates.dt.year + (dates.dt.month - 1) / 12
+    x = dates.dt.year + (dates.dt.month - 1) / 12 - SLOPE_EPOCH_YEAR
     m, _ = np.polyfit(x, depths, 1)
     return m
 

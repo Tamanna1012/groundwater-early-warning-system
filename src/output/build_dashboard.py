@@ -288,7 +288,14 @@ def main() -> None:
     )
 
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
-    OUT_HTML.write_text(html)
+    # encoding is explicit on purpose: the page declares <meta charset="utf-8">,
+    # while write_text() without it uses the platform's locale encoding -- which
+    # is cp1252 on a default Windows install and fails outright on the inline
+    # Plotly bundle (it contains a U+FFFD literal), leaving a truncated file.
+    # newline="" keeps the bytes identical on every platform: the default
+    # translates \n to the OS line separator, so a Windows run would
+    # emit a CRLF copy of the same page and show up as a whole-file diff.
+    OUT_HTML.write_text(html, encoding="utf-8", newline="")
     print(f"Wrote {OUT_HTML} ({len(html):,} bytes)")
 
 

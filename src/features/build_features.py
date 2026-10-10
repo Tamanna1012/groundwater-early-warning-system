@@ -12,6 +12,12 @@ uses only that well's readings strictly before its own date. An earlier
 version of this script computed one full-history slope per well and reused
 it on every row, which was look-ahead bias (a training feature that could
 see the future). Fixed here -- see docs/FEATURES.md for the before/after.
+
+Every per-well feature here is also grouped per well, which sounds obvious
+but is easy to get wrong in pandas: a groupby's `.shift()` returns a plain
+Series, so chaining `.rolling()` onto it silently rolls across well
+boundaries. `rolling_mean_4` had exactly that bug and is now re-grouped
+before rolling; tests/test_features.py pins the behaviour.
 """
 
 from __future__ import annotations
@@ -41,7 +47,18 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     g = df.groupby("well_id")["depth_to_water_m"]
     df["n_prior_readings"] = df.groupby("well_id").cumcount()
     df["depth_last_reading"] = g.shift(1)
-    df["rolling_mean_4"] = g.shift(1).rolling(4, min_periods=1).mean().reset_index(level=0, drop=True)
+    # The .groupby(df["well_id"]) in the middle is load-bearing: g.shift(1)
+    # returns a plain Series (not a grouped object), so rolling straight off
+    # it would slide the 4-reading window ACROSS well boundaries -- the first
+    # rows of each well would average in the previous well's readings. Group
+    # again before rolling so each window stays inside one well.
+    df["rolling_mean_4"] = (
+        g.shift(1)
+        .groupby(df["well_id"])
+        .rolling(4, min_periods=1)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
 
     # depth_same_quarter_last_year: self-merge each reading against the same
     # well's reading exactly 1 year earlier (same season, different year).
@@ -54,13 +71,25 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
 
 MIN_POINTS_FOR_SLOPE = 3
 
+# The time axis is measured in years from this epoch rather than as raw
+# calendar years. The running-sums fit below computes `n*Sxx - Sx^2`, which
+# subtracts two large, nearly-equal numbers; with x ~ 2000 that cancellation
+# costs about 8 significant digits. Shifting by a constant cannot change a
+# slope, but it keeps x in 0..25 and the fit accurate to full precision.
+SLOPE_EPOCH_YEAR = 1996  # first year in the CGWB series
+
+
+def _year_axis(dates: pd.Series) -> np.ndarray:
+    """Dates as fractional years since SLOPE_EPOCH_YEAR."""
+    return (dates.dt.year + (dates.dt.month - 1) / 12 - SLOPE_EPOCH_YEAR).to_numpy()
+
 
 def _expanding_slope_for_well(group: pd.DataFrame) -> pd.Series:
     """Per-row trend (m/year) using only readings strictly BEFORE that row's
     own date -- an expanding-window linear fit, not the well's full history.
     Computed via running sums (standard incremental least-squares) so it's
     O(n) per well instead of refitting from scratch at every row."""
-    x = (group["date"].dt.year + (group["date"].dt.month - 1) / 12).to_numpy()
+    x = _year_axis(group["date"])
     y = group["depth_to_water_m"].to_numpy()
     n_total = len(x)
 
@@ -84,10 +113,19 @@ def add_trend_feature(df: pd.DataFrame) -> pd.DataFrame:
     """Per-row expanding-window trend (m/year): each row's slope uses only
     that well's readings strictly before its own date, so it's a legitimate
     training feature (no look-ahead), unlike a single full-history slope
-    per well would be."""
-    df["long_term_slope_m_per_year"] = (
-        df.groupby("well_id", group_keys=False).apply(_expanding_slope_for_well, include_groups=False)
-    )
+    per well would be.
+
+    Built by concatenating per-well results explicitly rather than with
+    `groupby(...).apply(...)`: when the applied function returns a Series,
+    apply *infers* whether to stack the results or widen them into a frame,
+    and that inference flips depending on how many groups there are and
+    whether their indexes line up -- it returns a DataFrame for a single
+    well, which then fails to assign to one column. Concatenating and
+    reindexing is the same result, with no inference involved.
+    """
+    slopes = [_expanding_slope_for_well(group) for _, group in df.groupby("well_id", sort=False)]
+    combined = pd.concat(slopes) if slopes else pd.Series(dtype="float64")
+    df["long_term_slope_m_per_year"] = combined.reindex(df.index)
     return df
 
 
@@ -169,6 +207,20 @@ def write_docs(features: pd.DataFrame) -> None:
             "well to fit a trend from yet.\n\n"
         )
         f.write(
+            "`depth_last_reading` and `rolling_mean_4` should always have *identical* coverage, "
+            "and it should be below 100%: both look only at readings before the current row, so "
+            "both are missing on exactly one row per well -- its first. That equality is a cheap "
+            "integrity check on this table, and it did not always hold. `rolling_mean_4` used to "
+            "report 100% coverage, which is impossible for a feature that excludes the current "
+            "reading; the cause was a window that rolled across well boundaries, so each well's "
+            "first rows averaged the *previous* well's readings. See the note below and "
+            "`tests/test_features.py`.\n\n"
+        )
+        f.write(
+            "## Note: two data-leakage bugs this table used to have\n\n"
+            "Both were found and fixed before any model was trained on it, and both are now "
+            "pinned by `tests/test_features.py`. The first was `rolling_mean_4` rolling across "
+            "well boundaries (above); the second is below.\n\n"
             "## Note: `long_term_slope_m_per_year` is an expanding-window feature\n\n"
             "Each row's value is fit using only that well's readings strictly BEFORE that row's own "
             "date -- never the row's own reading or any later one. This makes it safe to use as a "
